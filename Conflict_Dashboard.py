@@ -243,11 +243,16 @@ with col1:
             day_count,
             x='Day_dt',
             y='Conflict count',
-            color_discrete_map=color_map,
-            title="Conflicts count per Day",
+            title="Conflicts count per Day"
         )
-        fig_day.update_traces(marker_color="blue", width=15)  # single color for all bars
+        fig_day.update_xaxes(dtick=1)
+        #fig_day.update_traces(width=15, marker_color="blue")  # single color for all bars
         fig_day.update_layout(
+            title_font_size=24,
+            xaxis_title_font_size=18,
+            yaxis_title_font_size=18,
+            xaxis_tickfont_size=14,
+            yaxis_tickfont_size=14,
             xaxis=dict(
                 tickmode="array",
                 tickvals=list(day_count["Day_dt"]),
@@ -258,6 +263,14 @@ with col1:
             yaxis_title="Conflict count",
             bargap=0.05
         )
+        fig_day.update_yaxes(
+        tickfont=dict(size=14),   # change y tick font
+        title_font=dict(size=18), # change y-axis title font
+        showgrid=True,        # turn on horizontal grid lines
+        zeroline=True,        # show line at y=0
+        zerolinewidth=1.5,    # make it a bit thicker
+        zerolinecolor="gray"  # line color
+        )
         
         st.plotly_chart(fig_day, use_container_width=True)
     else:
@@ -267,6 +280,12 @@ with col2:
     # Hour plot
     fig_hour = px.bar(hour_count, x="Hour", y="Conflict count", title="Conflicts count per Hour")
     fig_hour.update_xaxes(dtick=1)
+    fig_hour.update_layout(
+            title_font_size=24,
+            xaxis_title_font_size=18,
+            yaxis_title_font_size=18,
+            xaxis_tickfont_size=14,
+            yaxis_tickfont_size=14)
     st.plotly_chart(fig_hour, use_container_width=True)
 
 # Indicator distribution(s)
