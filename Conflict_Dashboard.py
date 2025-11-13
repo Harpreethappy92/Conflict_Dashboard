@@ -12,8 +12,8 @@ from streamlit_folium import st_folium
 # -----------------------------
 # PAGE SETUP
 # -----------------------------
-st.set_page_config(page_title="Conflict Descriptive Stats & Heatmap", layout="wide")
-st.title("🚦 Traffic Conflict Analysis — Descriptive Stats + Heatmap")
+st.set_page_config(page_title="Traffic Conflict Dashboard", layout="wide")
+st.title("🚦 Traffic Conflict Dashboard")
 
 # -----------------------------
 # FILE UPLOAD
@@ -213,13 +213,13 @@ hour_count = all_hours.merge(hour_count, on="Hour", how="left").fillna(0)
 
 # Weekday colors
 color_map = {
-    "Monday": "lightblue",
-    "Tuesday": "lightgreen",
-    "Wednesday": "lightyellow",
-    "Thursday": "lightpink",
-    "Friday": "lightgray",
-    "Saturday": "lightcoral",
-    "Sunday": "lightgoldenrodyellow"
+    "Monday": "blue",
+    "Tuesday": "blue",
+    "Wednesday": "blue",
+    "Thursday": "blue",
+    "Friday": "blue",
+    "Saturday": "orange",
+    "Sunday": "orange"
 }
 
 # -----------------------------
@@ -229,17 +229,24 @@ st.subheader("📊 Descriptive Statistics")
 
 col1, col2 = st.columns(2)
 with col1:
-    # Day plot: chronological, centered, weekday colored
     if not day_count.empty:
+        # Ensure Weekday is categorical and in correct order
+        day_count['Weekday'] = pd.Categorical(
+            day_count['Weekday'],
+            categories=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+            ordered=True
+        )
+
+        # Map colors to each row
+        day_count['color'] = day_count['Weekday'].map(color_map)
         fig_day = px.bar(
             day_count,
-            x="Day_dt",
-            y="Conflict count",
-            color="Weekday",
+            x='Day_dt',
+            y='Conflict count',
             color_discrete_map=color_map,
-            title="Conflicts per Day (weekday highlighted)"
+            title="Conflicts count per Day",
         )
-        fig_day.update_traces(offsetgroup=0, width=0.6)
+        fig_day.update_traces(marker_color="blue", width=15)  # single color for all bars
         fig_day.update_layout(
             xaxis=dict(
                 tickmode="array",
@@ -249,15 +256,16 @@ with col1:
             ),
             xaxis_title="Date",
             yaxis_title="Conflict count",
-            bargap=0.15
+            bargap=0.05
         )
+        
         st.plotly_chart(fig_day, use_container_width=True)
     else:
         st.info("No day data to plot.")
 
 with col2:
     # Hour plot
-    fig_hour = px.bar(hour_count, x="Hour", y="Conflict count", title="Conflicts per Hour")
+    fig_hour = px.bar(hour_count, x="Hour", y="Conflict count", title="Conflicts count per Hour")
     fig_hour.update_xaxes(dtick=1)
     st.plotly_chart(fig_hour, use_container_width=True)
 
