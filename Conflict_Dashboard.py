@@ -17,82 +17,22 @@ st.title("🚦 Traffic Conflict Dashboard")
 
 # -----------------------------
 # -----------------------------
-# FILE SELECTION FROM GITHUB
-# -----------------------------
-import requests
-
-st.sidebar.header("📂 Select conflict dataset from GitHub")
-
-st.sidebar.header("📂 Select conflict dataset from GitHub")
-
-# GitHub configuration
-GITHUB_USER = "Harpreethappy92"
-GITHUB_REPO = "SampleData"
-GITHUB_BRANCH = "main"      # or "master"
-GITHUB_FOLDER = ""          # folder path if files are in a subfolder, else "" for repo root
-
-# Use GitHub API to list files in folder
-url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{GITHUB_FOLDER}?ref={GITHUB_BRANCH}"
-response = requests.get(url)
-
-if response.status_code != 200:
-    st.error("Failed to fetch file list from GitHub. Check repo/folder/branch settings.")
-    st.stop()
-
-files = response.json()
-csv_files = [f["name"] for f in files if f["name"].endswith(".csv")]
-
-if not csv_files:
-    st.warning("No CSV files found in the specified GitHub folder.")
-    st.stop()
-
-# Let user select a file
-selected_file = st.sidebar.selectbox("Choose a conflict data CSV", csv_files)
-
-# Construct the raw GitHub URL to load the CSV
-raw_url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/{GITHUB_FOLDER}/{selected_file}"
-
-# Remove double slashes if folder is empty
-raw_url = raw_url.replace("//", "/")
-
-try:
-    df = pd.read_csv(raw_url)
-    st.success(f"✅ Loaded '{selected_file}' with {len(df)} rows and {len(df.columns)} columns")
-except Exception as e:
-    st.error(f"Failed to load CSV from GitHub: {e}")
-    st.stop()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # FILE UPLOAD
 # -----------------------------
-#uploaded_file = st.file_uploader("📂 Upload your conflict data (CSV or Excel)", type=["csv", "xlsx"])
+uploaded_file = st.file_uploader("📂 Upload your conflict data (CSV or Excel)", type=["csv", "xlsx"])
 
-#if not uploaded_file:
-   # st.info("👆 Please upload your conflict dataset to begin.")
-  #  st.stop()
+if not uploaded_file:
+    st.info("👆 Please upload your conflict dataset to begin.")
+    st.stop()
 
 # Read file
-#if uploaded_file.name.endswith(".csv"):
-   # df = pd.read_csv(uploaded_file)
-#else:
-   # df = pd.read_excel(uploaded_file)
+if uploaded_file.name.endswith(".csv"):
+    df = pd.read_csv(uploaded_file)
+else:
+    df = pd.read_excel(uploaded_file)
 
-#st.success(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
+st.success(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
 
 # -----------------------------
 # ROAD USER MAP (UI only)
