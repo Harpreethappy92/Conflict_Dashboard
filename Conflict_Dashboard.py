@@ -16,21 +16,76 @@ st.set_page_config(page_title="Traffic Conflict Dashboard", layout="wide")
 st.title("🚦 Traffic Conflict Dashboard")
 
 # -----------------------------
-# FILE UPLOAD
 # -----------------------------
-uploaded_file = st.file_uploader("📂 Upload your conflict data (CSV or Excel)", type=["csv", "xlsx"])
+# FILE SELECTION FROM GITHUB
+# -----------------------------
+import requests
 
-if not uploaded_file:
-    st.info("👆 Please upload your conflict dataset to begin.")
+st.sidebar.header("📂 Select conflict dataset from GitHub")
+
+# GitHub configuration
+GITHUB_USER = "Harpreethappy92"      # replace with your GitHub username
+GITHUB_REPO = "SampleData"          # replace with your repo name
+GITHUB_BRANCH = "main"             # branch name
+GITHUB_FOLDER = "data"             # folder containing your CSVs
+
+# Fetch file list from GitHub API
+url = f"https://github.com/Harpreethappy92/SampleData"
+response = requests.get(url)
+
+if response.status_code != 200:
+    st.error("Failed to fetch file list from GitHub. Check repo/folder/branch settings.")
     st.stop()
 
-# Read file
-if uploaded_file.name.endswith(".csv"):
-    df = pd.read_csv(uploaded_file)
-else:
-    df = pd.read_excel(uploaded_file)
+files = response.json()
+csv_files = [f["name"] for f in files if f["name"].endswith(".csv")]
 
-st.success(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
+if not csv_files:
+    st.warning("No CSV files found in the specified GitHub folder.")
+    st.stop()
+
+selected_file = st.sidebar.selectbox("Choose a conflict data CSV", csv_files)
+
+# Load the selected file
+raw_url = f"https://github.com/Harpreethappy92/SampleData"
+
+try:
+    df = pd.read_csv(raw_url)
+    st.success(f"✅ Loaded '{selected_file}' with {len(df)} rows and {len(df.columns)} columns")
+except Exception as e:
+    st.error(f"Failed to load CSV from GitHub: {e}")
+    st.stop()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# FILE UPLOAD
+# -----------------------------
+#uploaded_file = st.file_uploader("📂 Upload your conflict data (CSV or Excel)", type=["csv", "xlsx"])
+
+#if not uploaded_file:
+   # st.info("👆 Please upload your conflict dataset to begin.")
+  #  st.stop()
+
+# Read file
+#if uploaded_file.name.endswith(".csv"):
+   # df = pd.read_csv(uploaded_file)
+#else:
+   # df = pd.read_excel(uploaded_file)
+
+#st.success(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
 
 # -----------------------------
 # ROAD USER MAP (UI only)
