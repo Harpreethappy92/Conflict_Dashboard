@@ -33,9 +33,40 @@ else:
 st.success(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
 
 # -----------------------------
+# ROAD USER MAP (UI only)
+# -----------------------------
+road_user_map = {
+    1: "Commercial vehcile",
+    2: "Bus",
+    3: "Passenger car",
+    4: "Pedestrian",
+    5: "Bicycle",
+    6: "Motorbike",
+    7: "Ute/Pickup truck",
+    8: "Van",
+    9: "Child",
+    10: "Adult",
+    11: "Elderly",
+    12: "Dog",
+    13: "Pram",
+    14: "Scooter",
+    15: "Skateboard",
+    16: "Wheelchair",
+    17: "Mobility scooters",
+    18: "Individual Dog",
+    19: "Articulated truck",
+    20: "Rigid truck",
+    21: "Double trailer",
+    22: "Triple trailer",
+    23: "Car/Ute with trailer",
+    24: "E-scooters"
+}
+# reverse mapping for converting back to numeric codes
+road_user_reverse_map = {v: k for k, v in road_user_map.items()}
+
+# -----------------------------
 # TIME CONVERSION
 # -----------------------------
-# Use the formula you specified
 time_col = "time" if "time" in df.columns else ("video" if "video" in df.columns else None)
 if time_col:
     df["datetime"] = pd.to_datetime(((df[time_col] / 86400000) + 25569), unit="D", origin="1899-12-30")
@@ -80,23 +111,56 @@ for col in expected_cols:
     if col not in df.columns:
         df[col] = np.nan
 
-# Multiselects for road user types / directions / encounter
-ru1_list = sorted(df["RoadUser1_type"].dropna().unique())
-ru2_list = sorted(df["RoadUser2_type"].dropna().unique())
+# -----------------------------
+# BUILD UI LABEL LISTS (no modification of df)
+# -----------------------------
+# For road user lists: build from unique numeric codes present in the dataset,
+# map to labels for display. Keep the original numeric df unmodified.
+def build_label_list_from_numeric(col):
+    if col not in df.columns:
+        return []
+    uniques = sorted(pd.Series(df[col].dropna().unique()))
+    labels = [road_user_map.get(int(x), str(int(x))) if (not pd.isna(x) and str(x).strip() != "") else "" for x in uniques]
+    return labels
+
+ru1_list = build_label_list_from_numeric("RoadUser1_type")
+ru2_list = build_label_list_from_numeric("RoadUser2_type")
+
+# Directions and encounter types (use raw values as before)
 dir1_list = sorted(df["RoadUser1_direction"].dropna().unique())
 dir2_list = sorted(df["RoadUser2_direction"].dropna().unique())
 encounter_list = sorted(df["Encounter_type"].dropna().unique())
 
-ru1_selected = st.sidebar.multiselect("Road User 1 Type", ru1_list, default=ru1_list)
-ru2_selected = st.sidebar.multiselect("Road User 2 Type", ru2_list, default=ru2_list)
+# Sidebar multiselects (showing labels for road users)
+ru1_selected_labels = st.sidebar.multiselect("Road User 1 Type", ru1_list, default=ru1_list)
+ru2_selected_labels = st.sidebar.multiselect("Road User 2 Type", ru2_list, default=ru2_list)
 dir1_selected = st.sidebar.multiselect("RoadUser1 Direction", dir1_list, default=dir1_list)
 dir2_selected = st.sidebar.multiselect("RoadUser2 Direction", dir2_list, default=dir2_list)
 encounter_selected = st.sidebar.multiselect("Encounter Type", encounter_list, default=encounter_list)
+
+# Convert selected labels back to numeric codes for filtering (if label isn't found, try converting to int)
+def labels_to_numeric(labels):
+    nums = []
+    for lbl in labels:
+        if lbl in road_user_reverse_map:
+            nums.append(road_user_reverse_map[lbl])
+        else:
+            # attempt to parse label as integer (in case label is numeric string)
+            try:
+                nums.append(int(lbl))
+            except Exception:
+                # skip unconvertible labels
+                pass
+    return nums
+
+ru1_selected = labels_to_numeric(ru1_selected_labels)
+ru2_selected = labels_to_numeric(ru2_selected_labels)
 
 # -----------------------------
 # BUILD BASE FILTERED DF (ru/dir/encounter)
 # -----------------------------
 base_mask = pd.Series(True, index=df.index)
+
 if ru1_selected:
     base_mask &= df["RoadUser1_type"].isin(ru1_selected)
 if ru2_selected:
@@ -116,7 +180,6 @@ base_df = df[base_mask].copy()
 ttc_df = pd.DataFrame()
 pet_df = pd.DataFrame()
 
-# Helper to apply threshold filter
 def apply_threshold(df_in, col, threshold, filter_type):
     if col not in df_in.columns:
         return pd.DataFrame()
@@ -142,6 +205,7 @@ if indicator_mode in ("pet", "both"):
 # APPLY LEADER–FOLLOWER TO PET (optional)
 # -----------------------------
 if apply_leader_follower and not pet_df.empty:
+    # leader–follower logic uses the ORIGINAL numeric codes
     PEDESTRIAN_CODES = [4, 9, 10, 11, 12, 13, 15, 16, 17, 18, 24]
     BICYCLE_CODES = [5]
     VRU_CODES = PEDESTRIAN_CODES + BICYCLE_CODES
@@ -179,7 +243,6 @@ elif indicator_mode == "pet":
 else:  # both
     filtered_df = pd.concat([ttc_df, pet_df], ignore_index=True).drop_duplicates().reset_index(drop=True)
 
-# ensure we have copy to avoid pandas chain issues
 filtered_df = filtered_df.copy()
 
 st.markdown(f"**Filtered conflicts: {len(filtered_df)}**")
@@ -191,11 +254,9 @@ if filtered_df.empty:
 # -----------------------------
 # PREPARE PLOTTING FIELDS
 # -----------------------------
-# Ensure Day is datetime and DayName exists
 if "datetime" in filtered_df.columns:
     filtered_df["Day_dt"] = pd.to_datetime(filtered_df["Day"])
 else:
-    # if no datetime, try to coerce from Day column
     try:
         filtered_df["Day_dt"] = pd.to_datetime(filtered_df["Day"])
     except Exception:
@@ -203,7 +264,6 @@ else:
 
 filtered_df["Weekday"] = filtered_df["Day_dt"].dt.day_name()
 
-# Build day_count and hour_count for combined (or single) view
 day_count = filtered_df.groupby("Day_dt").size().reset_index(name="Conflict count").sort_values("Day_dt")
 day_count["Weekday"] = day_count["Day_dt"].dt.day_name()
 
@@ -211,7 +271,6 @@ hour_count = filtered_df.groupby("Hour").size().reset_index(name="Conflict count
 all_hours = pd.DataFrame({"Hour": range(24)})
 hour_count = all_hours.merge(hour_count, on="Hour", how="left").fillna(0)
 
-# Weekday colors
 color_map = {
     "Monday": "blue",
     "Tuesday": "blue",
@@ -230,14 +289,11 @@ st.subheader("📊 Descriptive Statistics")
 col1, col2 = st.columns(2)
 with col1:
     if not day_count.empty:
-        # Ensure Weekday is categorical and in correct order
         day_count['Weekday'] = pd.Categorical(
             day_count['Weekday'],
             categories=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
             ordered=True
         )
-
-        # Map colors to each row
         day_count['color'] = day_count['Weekday'].map(color_map)
         fig_day = px.bar(
             day_count,
@@ -246,7 +302,6 @@ with col1:
             title="Conflicts count per Day"
         )
         fig_day.update_xaxes(dtick=1)
-        #fig_day.update_traces(width=15, marker_color="blue")  # single color for all bars
         fig_day.update_layout(
             title_font_size=24,
             xaxis_title_font_size=18,
@@ -264,28 +319,26 @@ with col1:
             bargap=0.05
         )
         fig_day.update_yaxes(
-        tickfont=dict(size=14),   # change y tick font
-        title_font=dict(size=18), # change y-axis title font
-        showgrid=True,        # turn on horizontal grid lines
-        zeroline=True,        # show line at y=0
-        zerolinewidth=1.5,    # make it a bit thicker
-        zerolinecolor="gray"  # line color
+            tickfont=dict(size=14),
+            title_font=dict(size=18),
+            showgrid=True,
+            zeroline=True,
+            zerolinewidth=1.5,
+            zerolinecolor="gray"
         )
-        
         st.plotly_chart(fig_day, use_container_width=True)
     else:
         st.info("No day data to plot.")
 
 with col2:
-    # Hour plot
     fig_hour = px.bar(hour_count, x="Hour", y="Conflict count", title="Conflicts count per Hour")
     fig_hour.update_xaxes(dtick=1)
     fig_hour.update_layout(
-            title_font_size=24,
-            xaxis_title_font_size=18,
-            yaxis_title_font_size=18,
-            xaxis_tickfont_size=14,
-            yaxis_tickfont_size=14)
+        title_font_size=24,
+        xaxis_title_font_size=18,
+        yaxis_title_font_size=18,
+        xaxis_tickfont_size=14,
+        yaxis_tickfont_size=14)
     st.plotly_chart(fig_hour, use_container_width=True)
 
 # Indicator distribution(s)
@@ -300,7 +353,7 @@ elif indicator_mode == "pet":
         st.plotly_chart(px.histogram(filtered_df, x="pet", nbins=30, title="PET distribution"), use_container_width=True)
     else:
         st.warning("PET column not present.")
-else:  # both
+else:
     r1, r2 = st.columns(2)
     with r1:
         if "ttc" in filtered_df.columns and filtered_df["ttc"].notna().any():
@@ -313,7 +366,6 @@ else:  # both
         else:
             st.info("No PET values in filtered set.")
 
-# Show descriptive tables for indicators when both selected
 if indicator_mode == "both":
     st.subheader("Indicator Summary (Both)")
     rows = []
@@ -337,7 +389,6 @@ if indicator_mode == "both":
 # -----------------------------
 st.subheader("🌍 Conflict Heatmap")
 
-# detect lat/lon column names similar to earlier code
 def detect_latlon(df_local):
     lat_candidates = [c for c in df_local.columns if c.lower() in ("lat", "latitude", "lat_dd", "y", "lat_deg")]
     lon_candidates = [c for c in df_local.columns if c.lower() in ("lon", "lng", "longitude", "long", "x", "lon_deg")]
@@ -347,13 +398,11 @@ def detect_latlon(df_local):
 
 lat_col, lon_col = detect_latlon(filtered_df)
 
-# allow user override if detection failed
 if lat_col is None or lon_col is None:
-    st.info("No lat/lon auto-detected. Please select columns for latitude and longitude.")
+    st.info("No lat/lon auto-detected. Please select manually.")
     lat_col = st.selectbox("Latitude column", options=[None] + list(filtered_df.columns))
     lon_col = st.selectbox("Longitude column", options=[None] + list(filtered_df.columns))
 
-# compute center
 if lat_col and lon_col and lat_col in filtered_df.columns and lon_col in filtered_df.columns:
     center_lat = float(filtered_df[lat_col].mean())
     center_lon = float(filtered_df[lon_col].mean())
@@ -362,25 +411,14 @@ else:
 
 zoom = st.slider("Zoom level", 12, 22, 17)
 
-# base satellite map
 m_heat = folium.Map(location=[center_lat, center_lon], zoom_start=zoom, tiles=None, max_zoom=22)
-folium.TileLayer(
-    tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-    attr="Google Satellite",
-    name="Google Satellite",
-    max_zoom=22
-).add_to(m_heat)
+folium.TileLayer(tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+                 attr="Google Satellite", name="Google Satellite", max_zoom=22).add_to(m_heat)
 
-# add heat
 if lat_col in filtered_df.columns and lon_col in filtered_df.columns:
     pts = filtered_df[[lat_col, lon_col]].dropna().values.tolist()
     if pts:
         HeatMap(pts, radius=10, blur=15, max_zoom=22).add_to(m_heat)
-    else:
-        st.warning("No valid lat/lon points to draw heatmap.")
-else:
-    st.warning("Latitude/Longitude columns invalid for heatmap.")
-
 folium.LayerControl().add_to(m_heat)
 st.components.v1.html(m_heat._repr_html_(), height=600, scrolling=True)
 
@@ -390,18 +428,12 @@ st.components.v1.html(m_heat._repr_html_(), height=600, scrolling=True)
 st.subheader("🟩 Optional: Draw Region of Interest (ROI)")
 
 m_draw = folium.Map(location=[center_lat, center_lon], zoom_start=zoom, tiles=None, max_zoom=22)
-folium.TileLayer(
-    tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-    attr="Google Satellite",
-    name="Google Satellite",
-    max_zoom=22
-).add_to(m_draw)
+folium.TileLayer(tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+                 attr="Google Satellite", name="Google Satellite", max_zoom=22).add_to(m_draw)
 
-Draw(
-    draw_options={"polygon": True, "rectangle": True, "polyline": False,
-                  "circle": False, "marker": False, "circlemarker": False},
-    edit_options={"edit": True, "remove": True}
-).add_to(m_draw)
+Draw(draw_options={"polygon": True, "rectangle": True, "polyline": False,
+                   "circle": False, "marker": False, "circlemarker": False},
+     edit_options={"edit": True, "remove": True}).add_to(m_draw)
 folium.LayerControl().add_to(m_draw)
 
 draw_result = st_folium(m_draw, returned_objects=["all_drawings", "last_active_drawing"], height=600, width="100%")
@@ -421,12 +453,8 @@ if draw_result and draw_result.get("last_active_drawing") and lat_col in filtere
     if not roi_filtered.empty:
         m_roi = folium.Map(location=[float(roi_filtered[lat_col].mean()), float(roi_filtered[lon_col].mean())],
                            zoom_start=zoom, tiles=None, max_zoom=22)
-        folium.TileLayer(
-            tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-            attr="Google Satellite",
-            name="Google Satellite",
-            max_zoom=22
-        ).add_to(m_roi)
+        folium.TileLayer(tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+                         attr="Google Satellite", name="Google Satellite", max_zoom=22).add_to(m_roi)
         HeatMap(roi_filtered[[lat_col, lon_col]].values.tolist(), radius=10, blur=15).add_to(m_roi)
         folium.LayerControl().add_to(m_roi)
         st.components.v1.html(m_roi._repr_html_(), height=500, scrolling=True)
@@ -449,8 +477,15 @@ else:
     data_to_download = filtered_df
     filename = f"filtered_conflicts_{indicator_mode}.csv"
 
-if not data_to_download.empty:
-    csv = data_to_download.to_csv(index=False).encode("utf-8")
+# Export original numeric columns only (ensure no UI label fields are present)
+# If you want to explicitly control exported columns, you can set export_cols list below.
+export_df = data_to_download.copy()
+
+# Drop any accidental UI label columns (defensive)
+export_df = export_df.drop(columns=["RoadUser1_label", "RoadUser2_label"], errors="ignore")
+
+if not export_df.empty:
+    csv = export_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "⬇️ Download Selected Data",
         data=csv,
