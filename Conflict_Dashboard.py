@@ -23,14 +23,16 @@ import requests
 
 st.sidebar.header("📂 Select conflict dataset from GitHub")
 
-# GitHub configuration
-GITHUB_USER = "Harpreethappy92"      # replace with your GitHub username
-GITHUB_REPO = "SampleData"          # replace with your repo name
-#GITHUB_BRANCH = "main"             # branch name
-#GITHUB_FOLDER = "data"             # folder containing your CSVs
+st.sidebar.header("📂 Select conflict dataset from GitHub")
 
-# Fetch file list from GitHub API
-url = f"https://github.com/Harpreethappy92/SampleData"
+# GitHub configuration
+GITHUB_USER = "Harpreethappy92"
+GITHUB_REPO = "SampleData"
+GITHUB_BRANCH = "main"      # or "master"
+GITHUB_FOLDER = ""          # folder path if files are in a subfolder, else "" for repo root
+
+# Use GitHub API to list files in folder
+url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{GITHUB_FOLDER}?ref={GITHUB_BRANCH}"
 response = requests.get(url)
 
 if response.status_code != 200:
@@ -44,10 +46,14 @@ if not csv_files:
     st.warning("No CSV files found in the specified GitHub folder.")
     st.stop()
 
+# Let user select a file
 selected_file = st.sidebar.selectbox("Choose a conflict data CSV", csv_files)
 
-# Load the selected file
-raw_url = f"https://github.com/Harpreethappy92/SampleData"
+# Construct the raw GitHub URL to load the CSV
+raw_url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/{GITHUB_FOLDER}/{selected_file}"
+
+# Remove double slashes if folder is empty
+raw_url = raw_url.replace("//", "/")
 
 try:
     df = pd.read_csv(raw_url)
@@ -55,6 +61,7 @@ try:
 except Exception as e:
     st.error(f"Failed to load CSV from GitHub: {e}")
     st.stop()
+
 
 
 
