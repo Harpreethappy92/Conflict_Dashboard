@@ -26,8 +26,8 @@ st.sidebar.header("📂 Select conflict dataset from GitHub")
 # GitHub configuration
 GITHUB_USER = "Harpreethappy92"      # replace with your GitHub username
 GITHUB_REPO = "SampleData"          # replace with your repo name
-GITHUB_BRANCH = "main"             # branch name
-GITHUB_FOLDER = "data"             # folder containing your CSVs
+#GITHUB_BRANCH = "main"             # branch name
+#GITHUB_FOLDER = "data"             # folder containing your CSVs
 
 # Fetch file list from GitHub API
 url = f"https://github.com/Harpreethappy92/SampleData"
